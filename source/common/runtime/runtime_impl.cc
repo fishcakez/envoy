@@ -274,11 +274,18 @@ void parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
 // Handle an absolutely awful corner case where we explicitly shove a yaml percent in a proto string
 // value.
 void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  if (!absl::StrContains(entry.raw_string_value_, "numerator:")) {
+  if (!absl::StrContains(entry.raw_string_value_, "numerator:") &&
+      !absl::StrContains(entry.raw_string_value_, "\"numerator\"")) {
     return;
   }
   envoy::type::v3::FractionalPercent converted_fractional_percent;
-  TRY_ASSERT_MAIN_THREAD { entry.fractional_percent_value_ = converted_fractional_percent; }
+  TRY_ASSERT_MAIN_THREAD {
+#ifdef ENVOY_ENABLE_YAML
+    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
+                                         ProtobufMessage::getStrictValidationVisitor());
+#endif
+    entry.fractional_percent_value_ = converted_fractional_percent;
+  }
   END_TRY
   catch (const ProtoValidationException& ex) {
     return;
